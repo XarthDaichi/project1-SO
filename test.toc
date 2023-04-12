@@ -1,0 +1,9 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {I}Resumen Ejecutivo}{1}{}%
+\contentsline {section}{\numberline {II}Introducción}{2}{}%
+\contentsline {section}{\numberline {III}Marco teórico}{2}{}%
+\contentsline {section}{\numberline {IV}Descripción de la solución}{2}{}%
+\contentsline {section}{\numberline {V}Resultados de pruebas}{2}{}%
+\contentsline {section}{\numberline {VI}Conclusiones}{2}{}%
+\contentsline {section}{\numberline {VII}Aprendizajes}{2}{}%
+\contentsline {section}{Referencias}{3}{}%
