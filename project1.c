@@ -20,16 +20,18 @@ void errorExit(char *strerr) {
 void *read_file(void *thread_index) {
     FILE *fileptr;
     char *buffer;
-    long readlen, totallen;
-    int index = *((int *)thread_index), read_size = filelen/productores_num;
-    printf("Comenzando el thread: %d\n", index);
+    long readlen = filelen/productores_num;
+    int index = *((int *)thread_index);
+    // printf("Comenzando el thread: %d\n", index);
     fileptr = fopen(filepath, "rb");
+    fseek(fileptr, readlen*index, SEEK_SET);
     if (index != productores_num-1) {
-        fseek(fileptr, read_size*index, read_size*index+1);
+        fseek(fileptr, readlen*(index+1), SEEK_SET);
     } else {
-        fseek(fileptr, read_size*index, SEEK_END);
+        fseek(fileptr, readlen*index, SEEK_END);
     }
     readlen = ftell(fileptr);
+    printf("%d: %ld\n", index, readlen);
     rewind(fileptr);
     buffer = (char *) malloc(readlen * sizeof(char));
     fread(buffer, readlen, 1, fileptr);
@@ -37,7 +39,7 @@ void *read_file(void *thread_index) {
         printf("%c", buffer[i]);
     }
     fclose(fileptr);
-    printf("Finalizando thread: %d\n", index);
+    // printf("Finalizando thread: %d\n", index);
 }
 
 void *modify_array(void *modifying_byte) {
