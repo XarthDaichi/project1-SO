@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < 256; i++) {
         array[i] = i;
     }
-    char test = '';
-    printf("%c", test);
+    char test = '\n';
+    printf("%d", array[test]);
     return 0;
 }
