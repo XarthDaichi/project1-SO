@@ -91,15 +91,22 @@ int main(int argc, char* argv[]) {
     // }
     // pthread_join(t4, NULL);
 
-    pthread_t thread1, thread2;
-    if (pthread_create(&thread1, NULL, thread1_routine, NULL) != 0)
-        errorExit("thread1 cannot be created");
-    if (pthread_create(&thread2, NULL, thread2_routine, NULL) != 0)
-        errorExit("thread2 cannot be created");
+    // pthread_t thread1, thread2;
+    // if (pthread_create(&thread1, NULL, thread1_routine, NULL) != 0)
+    //     errorExit("thread1 cannot be created");
+    // if (pthread_create(&thread2, NULL, thread2_routine, NULL) != 0)
+    //     errorExit("thread2 cannot be created");
     
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
+    // pthread_join(thread1, NULL);
+    // pthread_join(thread2, NULL);
 
-    printf("count value %d \n", count);
+    // printf("count value %d \n", count);
+
+    int array[256];
+    for (int i = 0; i < 256; i++) {
+        array[i] = i;
+    }
+    char test = '';
+    printf("%c", test);
     return 0;
 }
