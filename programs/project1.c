@@ -48,31 +48,37 @@ void *reading_file(void *thread_index) {
         pthread_cond_broadcast(&read_condition[j]);
     }
     fclose(fileptr);
+    printf("Closed reader thread\n");
 }
 
 void *adding_to_array(void *thread_index) {
     int index = *((int *)thread_index);
-    printf("%d: Started Consuming\n", index);
-    for (int i = index; i < BUFFERLEN && bytes_consumers > 0; i+=consumers_num) {
-        if(read[i] == -1) continue;
-        pthread_mutex_lock(&bytes_consumer_mutex);
-        bytes_consumers--;
-        pthread_mutex_unlock(&bytes_consumer_mutex);
-        pthread_mutex_lock(&buffer_mutex[i]);
-        while (read[i] == 0) {
+    // printf("%d: Started Consuming\n", index);
+    for (int i = index; i < BUFFERLEN && bytes_consumers; i+=consumers_num) {
+        if(read[i] != -1) {
+            pthread_mutex_lock(&buffer_mutex[i]);
+            while (read[i] == 0 && bytes_consumers != 0) {
+                // if (!bytes_consumers) break;
+                if (!bytes_consumers) printf("I'm still here!");
+                pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
+            }
             // if (!bytes_consumers) break;
-            pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
+            // printf("%d: Finished waiting\n");
+            pthread_mutex_lock(&bytes_consumer_mutex);
+            bytes_consumers--;
+            pthread_mutex_unlock(&bytes_consumer_mutex);
+            if (!bytes_consumers) printf("Released bytes_mutex\n");
+            pthread_mutex_lock(&solution_mutex[i]);
+            solution_array[buffer[i]]++;
+            pthread_mutex_unlock(&solution_mutex[i]);
+            read[i] = 0;
+            pthread_mutex_unlock(&buffer_mutex[i]);
+            if (!bytes_consumers) printf("Released buffer\n");
+            pthread_cond_broadcast(&consumed_condition[i]);
+            if (!bytes_consumers) printf("Broadcast this\n");
         }
-        // if (!bytes_consumers) break;
-        printf("%d: Finished waiting\n");
-        pthread_mutex_lock(&solution_mutex[i]);
-        solution_array[buffer[i]]++;
-        pthread_mutex_unlock(&solution_mutex[i]);
-        read[i] = 0;
-        pthread_mutex_unlock(&buffer_mutex[i]);
-        pthread_cond_broadcast(&consumed_condition[i]);
     }
-    printf("%d: Finished consuming\n", index);
+    printf("Closed consumer thread\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -117,13 +123,16 @@ int main(int argc, char *argv[]) {
     int larger;
     larger = (consumers_num > producers_num) ? consumers_num : producers_num;
     int index[larger];
-    for(int i = 0; i < larger; i++) index[i] = i;
+    for (int i = 0; i < larger; i++) index[i] = i;
     for (int i = 0; i < producers_num; i++) {
         if (pthread_create(&producers[i], NULL, reading_file, &index[i]) != 0) {
             printf("Thread creation fucked up!: consumers");
             return -1;
         }
     }
+
+    int visited_p[producers_num];
+    for (int i = 0; i < producers_num; i++) visited_p[i] = 0;
     while(bytes_consumers > 0) {
         for (int i = 0; i < consumers_num; i++) {
             if (pthread_create(&consumers[i], NULL, adding_to_array, &index[i]) != 0) {
@@ -132,17 +141,18 @@ int main(int argc, char *argv[]) {
             }
         }
         for (int i = 0; i < producers_num; i++) {
-            if (pthread_join(producers[i], NULL) != 0) {
+            if (!visited_p[i]) {
+                if (pthread_join(producers[i], NULL) == 0) {
+                    visited_p[i] = 1;
+                }
             }
         }
         for (int i = 0; i < consumers_num; i++) {
             if (pthread_join(consumers[i], NULL) != 0) {
-                printf("Thread join fucked up!: consumers");
-                return -1;
             }
         }
     }
-    printf("Finished");
+    // printf("Finished\n");
     for (int i = 0; i < BUFFERLEN; i++) {
         if (i < 256) {
             pthread_mutex_destroy(&solution_mutex[i]);
@@ -152,4 +162,5 @@ int main(int argc, char *argv[]) {
         pthread_cond_destroy(&consumed_condition[i]);
         pthread_cond_destroy(&read_condition[i]);
     }
+    printf("%s", &buffer);
 }
