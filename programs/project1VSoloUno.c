@@ -18,34 +18,54 @@ static unsigned char buffer[BUFFERLEN];
 static int pos_p = 0;
 static int pos_c = 0;
 
+int flag = 1;
+
 static int solution_array[256];
 
 static int producers_num;
 static int consumers_num;
 
-static cahr *filepath;
+static char *filepath;
 static long filelen;
+static long filepos;
 static long bytes_consumers;
 
 void *reading_file() {
     FILE *fileptr;
     fileptr = fopen(filepath, "rb");
-    for (int i = 0; i < filelen; i++) {
-        fseek(fileptr, i, SEEK_SET);
+    while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
-        while(read[i]) {
-            pthread_cond_wait(&consumed_condition);
+        if (pos_p > BUFFERLEN) pos_p = 0;
+        fseek(fileptr, filepos, SEEK_SET);
+        while(read[pos_p]) {
+            pthread_cond_wait(&consumed_condition, &buffer_mutex);
         }
         fread(buffer+pos_p, 1, 1, fileptr);
-        read[j] = 1;
+        read[pos_p] = 1;
+        bytes_consumers++;
+        pos_p++;
+        filepos++;
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_broadcast(&read_condition);
     }
-    close(fileptr);
+    fclose(fileptr);
+    flag = 0;
 }
 
 void *adding_to_array() {
-
+    while(flag || bytes_consumers != 0) {
+        pthread_mutex_lock(&buffer_mutex);
+        while(!read[pos_c]) {
+            pthread_cond_wait(&read_condition, &buffer_mutex);
+        }
+        if (pos_c > BUFFERLEN) pos_c = 0;
+        solution_array[buffer[pos_c]]++;
+        pos_c++;
+        bytes_consumers--;
+        pthread_mutex_unlock(&buffer_mutex);
+        pthread_cond_broadcast(&consumed_condition);
+    }
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
@@ -81,11 +101,8 @@ int main(int argc, char *argv[]) {
     fileptr = fopen(filepath, "rb");
     fseek(fileptr, 0, SEEK_END);
     filelen = ftell(fileptr);
-    bytes_consumers = filelen;
     rewind(fileptr);
     fclose(fileptr);
-    int larger;
-    larger = (consumers_num > producers_num) ? consumers_num : producers_num;
     for (int i = 0; i < producers_num; i++) {
         if (pthread_create(&producers[i], NULL, reading_file, NULL) != 0) {
             printf("No se pudo crear el hilo de productores");
@@ -114,9 +131,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for (int i = 0; i < 256; i++) {
-        if (solution_array[i] != 0) printf("%d aparece %d veces\n", i, solution_array[i]);
-    }
+    printf("%s\n", &buffer);
+
+    // for (int i = 0; i < 256; i++) {
+    //     if (solution_array[i] != 0) printf("%d aparece %d veces\n", i, solution_array[i]);
+    // }
 
     pthread_mutex_destroy(&solution_mutex);
     pthread_mutex_destroy(&buffer_mutex);
