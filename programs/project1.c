@@ -39,7 +39,7 @@ void *reading_file(void *thread_index) {
         if (j > BUFFERLEN) j = index;
         fseek(fileptr, i, SEEK_SET);
         pthread_mutex_lock(&buffer_mutex[j]);
-        while(read[j] == 1) {
+        while(read[j]) {
             pthread_cond_wait(&consumed_condition[j], &buffer_mutex[j]);
         }
         fread(buffer+j, 1, 1, fileptr);
@@ -48,37 +48,28 @@ void *reading_file(void *thread_index) {
         pthread_cond_broadcast(&read_condition[j]);
     }
     fclose(fileptr);
-    printf("Closed reader thread\n");
 }
 
 void *adding_to_array(void *thread_index) {
     int index = *((int *)thread_index);
     // printf("%d: Started Consuming\n", index);
     for (int i = index; i < BUFFERLEN && bytes_consumers; i+=consumers_num) {
-        if(read[i] != -1) {
-            pthread_mutex_lock(&buffer_mutex[i]);
-            while (read[i] == 0 && bytes_consumers != 0) {
-                // if (!bytes_consumers) break;
-                if (!bytes_consumers) printf("I'm still here!");
-                pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
-            }
-            // if (!bytes_consumers) break;
-            // printf("%d: Finished waiting\n");
-            pthread_mutex_lock(&bytes_consumer_mutex);
-            bytes_consumers--;
-            pthread_mutex_unlock(&bytes_consumer_mutex);
-            if (!bytes_consumers) printf("Released bytes_mutex\n");
-            pthread_mutex_lock(&solution_mutex[i]);
-            solution_array[buffer[i]]++;
-            pthread_mutex_unlock(&solution_mutex[i]);
-            read[i] = 0;
-            pthread_mutex_unlock(&buffer_mutex[i]);
-            if (!bytes_consumers) printf("Released buffer\n");
-            pthread_cond_broadcast(&consumed_condition[i]);
-            if (!bytes_consumers) printf("Broadcast this\n");
+        pthread_mutex_lock(&buffer_mutex[i]);
+        while (!read[i] && bytes_consumers) {
+            pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
         }
+        // printf("%d: Finished waiting\n");
+        pthread_mutex_lock(&bytes_consumer_mutex);
+        bytes_consumers--;
+        pthread_mutex_unlock(&bytes_consumer_mutex);
+        pthread_mutex_lock(&solution_mutex[i]);
+        solution_array[buffer[i]]++;
+        buffer[i] = '\000';
+        pthread_mutex_unlock(&solution_mutex[i]);
+        read[i] = 0;
+        pthread_mutex_unlock(&buffer_mutex[i]);
+        if (bytes_consumers) pthread_cond_broadcast(&consumed_condition[i]);
     }
-    printf("Closed consumer thread\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -152,7 +143,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
-    // printf("Finished\n");
+    printf("Finished\n");
     for (int i = 0; i < BUFFERLEN; i++) {
         if (i < 256) {
             pthread_mutex_destroy(&solution_mutex[i]);
