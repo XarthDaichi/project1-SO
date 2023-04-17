@@ -6,11 +6,12 @@
 
 #define BUFFERLEN 1000
 
-static pthread_mutex_t solution_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t solution_mutex;
+static pthread_mutex_t buffer_mutex;
+static pthread_mutexattr_t buffer_mutex_attr;
 
-static pthread_cond_t read_condition = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t consumed_condition = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t read_condition;
+static pthread_cond_t consumed_condition;
 
 int read[BUFFERLEN];
 
@@ -35,19 +36,19 @@ void *reading_file() {
     fileptr = fopen(filepath, "rb");
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
-        if (pos_p > BUFFERLEN) pos_p = 0;
+        if (pos_p >= BUFFERLEN) pos_p = 0;
         while(read[pos_p]) {
             pthread_cond_wait(&consumed_condition, &buffer_mutex);
         }
         fseek(fileptr, filepos, SEEK_SET);
         fread(buffer+pos_p, 1, 1, fileptr);
-        read[pos_p] = 1;
         bytes_consumers++;
         pos_p++;
         filepos++;
+        read[pos_p] = 1;
+        printf("%s\n", &buffer);
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_broadcast(&read_condition);
-        printf("%s\n");
     }
     fclose(fileptr);
     flag = 0;
@@ -56,13 +57,14 @@ void *reading_file() {
 void *adding_to_array() {
     while(flag || bytes_consumers != 0) {
         pthread_mutex_lock(&buffer_mutex);
-        if (pos_c > BUFFERLEN) pos_c = 0;
+        if (pos_c >= BUFFERLEN) pos_c = 0;
         while(!read[pos_c]) {
             pthread_cond_wait(&read_condition, &buffer_mutex);
         }
         solution_array[buffer[pos_c]]++;
         pos_c++;
         bytes_consumers--;
+        read[pos_c] = 0;
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_broadcast(&consumed_condition);
     }
@@ -74,9 +76,15 @@ int main(int argc, char *argv[]) {
         if (i < 256) {
             solution_array[i] = 0;
         }
+        // pthread_cond_init(&read_condition[i], NULL);
+        // pthread_cond_init(&consumed_condition[i], NULL);
         read[i] = 0;
     }
-    
+    pthread_mutexattr_init(&buffer_mutex_attr);
+    pthread_mutexattr_settype(&buffer_mutex_attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&buffer_mutex, NULL);
+    pthread_mutex_init(&solution_mutex, NULL);
+
     if (argc > 1) producers_num = atoi(argv[1]);
     else {
         printf("Falta el numero de productores");
@@ -136,7 +144,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("%s\n", &buffer);
+    // printf("%s\n", &buffer);
 
     // for (int i = 0; i < 256; i++) {
     //     if (solution_array[i] != 0) printf("%d aparece %d veces\n", i, solution_array[i]);
@@ -144,6 +152,7 @@ int main(int argc, char *argv[]) {
 
     pthread_mutex_destroy(&solution_mutex);
     pthread_mutex_destroy(&buffer_mutex);
+    pthread_mutexattr_destroy(&buffer_mutex_attr);
     pthread_cond_destroy(&consumed_condition);
     pthread_cond_destroy(&read_condition);
 
