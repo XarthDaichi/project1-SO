@@ -48,37 +48,33 @@ void *reading_file(void *thread_index) {
         }
         fread(buffer+buffer_adder_pos, 1, 1, fileptr);
         read[buffer_adder_pos] = 1;
-        printf("%s", &buffer);
         pthread_mutex_unlock(&buffer_mutex[buffer_adder_pos]);
         pthread_cond_broadcast(&read_condition[buffer_adder_pos]);
         file_reader_pos += producers_num;
         buffer_adder_pos += producers_num;
     }
     fclose(fileptr);
-    end_of_file_flag = 0;
 }
 
 void *adding_to_array(void *thread_index) {
     int index = *((int *)thread_index);
-    int buffer_consumer_pos = index;
     // printf("%d: Started Consuming\n", index);
-    while(end_of_file_flag || bytes_consumers) {
-        if (buffer_consumer_pos >= BUFFERLEN) buffer_consumer_pos = index;
-        pthread_mutex_lock(&buffer_mutex[buffer_consumer_pos]);
-        while (!read[buffer_consumer_pos] && bytes_consumers) {
-            pthread_cond_wait(&read_condition[buffer_consumer_pos], &buffer_mutex[buffer_consumer_pos]);
+    for (int i = index; i < BUFFERLEN && bytes_consumers; i+=consumers_num) {
+        pthread_mutex_lock(&buffer_mutex[i]);
+        while (!read[i] && bytes_consumers) {
+            pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
         }
         // printf("%d: Finished waiting\n");
         pthread_mutex_lock(&bytes_consumer_mutex);
         bytes_consumers--;
         pthread_mutex_unlock(&bytes_consumer_mutex);
-        pthread_mutex_lock(&solution_mutex[buffer_consumer_pos]);
-        solution_array[buffer[buffer_consumer_pos]]++;
-        buffer[buffer_consumer_pos] = '\000';
-        pthread_mutex_unlock(&solution_mutex[buffer_consumer_pos]);
-        read[buffer_consumer_pos] = 0;
-        pthread_mutex_unlock(&buffer_mutex[buffer_consumer_pos]);
-        pthread_cond_broadcast(&consumed_condition[buffer_consumer_pos]);
+        pthread_mutex_lock(&solution_mutex[i]);
+        solution_array[buffer[i]]++;
+        buffer[i] = '\000';
+        pthread_mutex_unlock(&solution_mutex[i]);
+        read[i] = 0;
+        pthread_mutex_unlock(&buffer_mutex[i]);
+        if (bytes_consumers) pthread_cond_broadcast(&consumed_condition[i]);
     }
 }
 
