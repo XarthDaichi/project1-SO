@@ -33,7 +33,7 @@ void *reading_file() {
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
         printf("(1) Locked mutex\n");
-        if (!flag) {
+        if (feof(fileptr)) {
             printf("(1) Unlocked mutex: %ld\n", pos_p);
             pthread_mutex_unlock(&buffer_mutex);
             pthread_exit((void*)0);
@@ -62,8 +62,13 @@ void *adding_to_array() {
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
-        while(pos_c+1 == pos_p) {
+        while(pos_c+1 == pos_p && flag) {
             pthread_cond_wait(&read_condition, &solution_mutex);
+        }
+        if(!filelen) {
+            printf("(2) Unlocked mutex: %ld\n", pos_c);
+            pthread_mutex_unlock(&solution_mutex);
+            pthread_exit((void*)0);
         }
         solution_array[buffer[pos_c%BUFFERLEN]]++;
         pos_c++;
