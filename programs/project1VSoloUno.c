@@ -36,10 +36,10 @@ void *reading_file() {
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
         if (pos_p > BUFFERLEN) pos_p = 0;
-        fseek(fileptr, filepos, SEEK_SET);
         while(read[pos_p]) {
             pthread_cond_wait(&consumed_condition, &buffer_mutex);
         }
+        fseek(fileptr, filepos, SEEK_SET);
         fread(buffer+pos_p, 1, 1, fileptr);
         read[pos_p] = 1;
         bytes_consumers++;
@@ -56,10 +56,10 @@ void *reading_file() {
 void *adding_to_array() {
     while(flag || bytes_consumers != 0) {
         pthread_mutex_lock(&buffer_mutex);
+        if (pos_c > BUFFERLEN) pos_c = 0;
         while(!read[pos_c]) {
             pthread_cond_wait(&read_condition, &buffer_mutex);
         }
-        if (pos_c > BUFFERLEN) pos_c = 0;
         solution_array[buffer[pos_c]]++;
         pos_c++;
         bytes_consumers--;
@@ -100,6 +100,10 @@ int main(int argc, char *argv[]) {
 
     FILE *fileptr;
     fileptr = fopen(filepath, "rb");
+    if (fileptr == NULL) {
+        printf("Estuvo mal la abrida de documento");
+        return -1;
+    }
     fseek(fileptr, 0, SEEK_END);
     filelen = ftell(fileptr);
     rewind(fileptr);
