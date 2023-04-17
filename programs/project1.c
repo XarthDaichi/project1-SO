@@ -21,6 +21,68 @@ static unsigned char buffer[BUFFERLEN];
 
 //array where things are going to get counted
 static int solution_array[256];
+static int solution_aux[256];
+
+void merge(int arr1[], int arr2[], int left1[], int left2[], int left_size, int right1[], int right2[], int right_size) {
+	int i = 0, j = 0, k = 0;
+	while (i < left_size && j < right_size) {
+		if (left1[i] <= right1[j]) {
+			arr1[k] = left1[i];
+			arr2[k] = left2[i];
+			i++;
+		}
+		else {
+			arr1[k] = right1[j];
+			arr2[k] = right2[j];
+			j++;
+		}
+		k++;
+	}
+	
+	while (i < left_size) {
+		arr1[k] = left1[i];
+		arr2[k] = left2[i];
+		i++;
+		k++;
+	}
+	
+	while (j < right_size) {
+		arr1[k] = right1[j];
+		arr2[k] = right2[j];
+		j++;
+		k++;
+	}
+}
+
+void mergesort(int arr1[], int arr2[], int size) {
+	if (size < 2)
+		return;
+	
+	int mid = size / 2;
+	int *left1 = (int*) malloc(mid * sizeof(int));
+	int *left2 = (int*) malloc(mid * sizeof(int));
+	int *right1 = (int*) malloc((size - mid) * sizeof(int));
+	int *right2 = (int*) malloc((size - mid) * sizeof(int));
+	
+	for (int i = 0; i < mid; i++) {
+		left1[i] = arr1[i];
+		left2[i] = arr2[i];
+	}
+	
+	for (int i = mid; i < size; i++) {
+		right1[i - mid] = arr1[i];
+		right2[i - mid] = arr2[i];
+	}
+	
+	mergesort(left1, left2, mid);
+	mergesort(right1, right2, size - mid);
+	merge(arr1, arr2, left1, left2, mid, right1, right2, size - mid);
+	
+	free(left1);
+	free(left2);
+	free(right1);
+	free(right2);
+}
 
 //inputs
 static int producers_num = 0;
