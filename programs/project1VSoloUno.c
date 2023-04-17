@@ -47,6 +47,7 @@ void *reading_file() {
         filepos++;
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_broadcast(&read_condition);
+        printf("%s\n");
     }
     fclose(fileptr);
     flag = 0;
