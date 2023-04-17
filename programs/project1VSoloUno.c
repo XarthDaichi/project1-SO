@@ -19,6 +19,7 @@ static long pos_c = 0;
 int flag = 1;
 
 static int solution_array[256] = {0};
+static int solution_aux[256];
 
 static int producers_num;
 static int consumers_num;
@@ -27,14 +28,75 @@ static char *filepath;
 static long filelen;
 static long consumers_final_pos;
 
+void merge(int arr1[], int arr2[], int left1[], int left2[], int left_size, int right1[], int right2[], int right_size) {
+	int i = 0, j = 0, k = 0;
+	while (i < left_size && j < right_size) {
+		if (left1[i] >= right1[j]) {
+			arr1[k] = left1[i];
+			arr2[k] = left2[i];
+			i++;
+		}
+		else {
+			arr1[k] = right1[j];
+			arr2[k] = right2[j];
+			j++;
+		}
+		k++;
+	}
+	
+	while (i < left_size) {
+		arr1[k] = left1[i];
+		arr2[k] = left2[i];
+		i++;
+		k++;
+	}
+	
+	while (j < right_size) {
+		arr1[k] = right1[j];
+		arr2[k] = right2[j];
+		j++;
+		k++;
+	}
+}
+
+void mergesort(int arr1[], int arr2[], int size) {
+	if (size < 2)
+		return;
+	
+	int mid = size / 2;
+	int *left1 = (int*) malloc(mid * sizeof(int));
+	int *left2 = (int*) malloc(mid * sizeof(int));
+	int *right1 = (int*) malloc((size - mid) * sizeof(int));
+	int *right2 = (int*) malloc((size - mid) * sizeof(int));
+	
+	for (int i = 0; i < mid; i++) {
+		left1[i] = arr1[i];
+		left2[i] = arr2[i];
+	}
+	
+	for (int i = mid; i < size; i++) {
+		right1[i - mid] = arr1[i];
+		right2[i - mid] = arr2[i];
+	}
+	
+	mergesort(left1, left2, mid);
+	mergesort(right1, right2, size - mid);
+	merge(arr1, arr2, left1, left2, mid, right1, right2, size - mid);
+	
+	free(left1);
+	free(left2);
+	free(right1);
+	free(right2);
+}
+
 void *reading_file() {
     FILE *fileptr;
     fileptr = fopen(filepath, "rb");
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
-        printf("(1) Locked mutex\n");
+        // printf("(1) Locked mutex\n");
         if (feof(fileptr)) {
-            printf("(1) Unlocked mutex: %ld\n", pos_p);
+            // printf("(1) Unlocked mutex: %ld\n", pos_p);
             pthread_mutex_unlock(&buffer_mutex);
             pthread_exit((void*)0);
         }
@@ -45,7 +107,7 @@ void *reading_file() {
         }
         pos_p++;
         if (feof(fileptr)) flag = 0;
-        printf("(1) Unlocked mutex: %ld\n", pos_p);
+        // printf("(1) Unlocked mutex: %ld\n", pos_p);
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_signal(&read_condition);
     }
@@ -56,9 +118,9 @@ void *reading_file() {
 void *adding_to_array() {
     while(filelen) {
         pthread_mutex_lock(&solution_mutex);
-        printf("(2) Locked mutex\n");
+        // printf("(2) Locked mutex\n");
         if(!filelen) {
-            printf("(2) Unlocked mutex: %ld\n", pos_c);
+            // printf("(2) Unlocked mutex: %ld\n", pos_c);
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
@@ -66,14 +128,14 @@ void *adding_to_array() {
             pthread_cond_wait(&read_condition, &solution_mutex);
         }
         if(!filelen) {
-            printf("(2) Unlocked mutex: %ld\n", pos_c);
+            // printf("(2) Unlocked mutex: %ld\n", pos_c);
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
         solution_array[buffer[pos_c%BUFFERLEN]]++;
         pos_c++;
         filelen--;
-        printf("(2) Unlocked mutex: %ld\n", pos_c);
+        // printf("(2) Unlocked mutex: %ld\n", pos_c);
         pthread_mutex_unlock(&solution_mutex);
         pthread_cond_signal(&consumed_condition);
     }
@@ -81,6 +143,8 @@ void *adding_to_array() {
 }
 
 int main(int argc, char *argv[]) {
+    for (int i = 0; i < 256; i++) solution_aux[i] = i;
+    
     if (argc > 1) producers_num = atoi(argv[1]);
     else {
         printf("Falta el numero de productores");
@@ -140,8 +204,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    mergesort(solution_array, solution_aux, 256);
+
     for (int i = 0; i < 256; i++) {
-        if (solution_array[i] != 0) printf("%d aparece %d veces\n", i, solution_array[i]);
+        if (solution_array[i] != 0) printf("%d aparece %d veces\n", solution_aux[i], solution_array[i]);
     }
 
     pthread_mutex_destroy(&solution_mutex);

@@ -3,4 +3,4 @@
 *.fls
 *.log
 *.synctex.gz
-./testFiles/*
+testFiles/*
