@@ -94,20 +94,19 @@ void *reading_file() {
     fileptr = fopen(filepath, "rb");
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
-        // printf("(1) Locked mutex\n");
         if (feof(fileptr)) {
-            // printf("(1) Unlocked mutex: %ld\n", pos_p);
             pthread_mutex_unlock(&buffer_mutex);
             pthread_exit((void*)0);
         }
         fseek(fileptr, pos_p, SEEK_SET);
         fread(buffer+(pos_p%BUFFERLEN), 1, 1, fileptr);
-        while(pos_p+1 == pos_c) {
-            pthread_cond_wait(&consumed_condition, &buffer_mutex);
+        if (pos_p >= BUFFERLEN) {
+            while((pos_p+1) % BUFFERLEN == pos_c % BUFFERLEN) {
+                pthread_cond_wait(&consumed_condition, &buffer_mutex);
+            }
         }
         pos_p++;
         if (feof(fileptr)) flag = 0;
-        // printf("(1) Unlocked mutex: %ld\n", pos_p);
         pthread_mutex_unlock(&buffer_mutex);
         pthread_cond_signal(&read_condition);
     }
@@ -118,24 +117,20 @@ void *reading_file() {
 void *adding_to_array() {
     while(filelen) {
         pthread_mutex_lock(&solution_mutex);
-        // printf("(2) Locked mutex\n");
         if(!filelen) {
-            // printf("(2) Unlocked mutex: %ld\n", pos_c);
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
-        while(pos_c+1 == pos_p && flag) {
+        while(pos_c+1 >= pos_p && flag) {
             pthread_cond_wait(&read_condition, &solution_mutex);
         }
         if(!filelen) {
-            // printf("(2) Unlocked mutex: %ld\n", pos_c);
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
         solution_array[buffer[pos_c%BUFFERLEN]]++;
         pos_c++;
         filelen--;
-        // printf("(2) Unlocked mutex: %ld\n", pos_c);
         pthread_mutex_unlock(&solution_mutex);
         pthread_cond_signal(&consumed_condition);
     }
