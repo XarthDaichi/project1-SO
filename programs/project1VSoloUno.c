@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
     FILE *fileptr;
     fileptr = fopen(filepath, "rb");
     if (fileptr == NULL) {
-        printf("Estuvo mal la abrida de documento");
+        printf("Fallo la apertura del documento");
         return -1;
     }
     fseek(fileptr, 0, SEEK_END);
