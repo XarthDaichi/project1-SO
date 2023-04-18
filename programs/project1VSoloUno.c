@@ -95,6 +95,7 @@ void *reading_file() {
     while(!feof(fileptr)) {
         pthread_mutex_lock(&buffer_mutex);
         if (feof(fileptr)) {
+            flag = 0;
             pthread_mutex_unlock(&buffer_mutex);
             pthread_exit((void*)0);
         }
@@ -108,9 +109,10 @@ void *reading_file() {
         pos_p++;
         if (feof(fileptr)) flag = 0;
         pthread_mutex_unlock(&buffer_mutex);
-        pthread_cond_signal(&read_condition);
+        pthread_cond_broadcast(&read_condition);
     }
     fclose(fileptr);
+    flag = 0;
     pthread_exit((void*)0);
 }
 
@@ -121,7 +123,7 @@ void *adding_to_array() {
             pthread_mutex_unlock(&solution_mutex);
             pthread_exit((void*)0);
         }
-        while(pos_c+1 >= pos_p && flag) {
+        while(pos_c >= pos_p && flag) {
             pthread_cond_wait(&read_condition, &solution_mutex);
         }
         if(!filelen) {
@@ -132,7 +134,7 @@ void *adding_to_array() {
         pos_c++;
         filelen--;
         pthread_mutex_unlock(&solution_mutex);
-        pthread_cond_signal(&consumed_condition);
+        pthread_cond_broadcast(&consumed_condition);
     }
     pthread_exit((void*)0);
 }

@@ -95,44 +95,61 @@ static long bytes_consumers;
 
 void *reading_file(void *thread_index) {
     int index = *((int *)thread_index);
+    long reading_pos = index;
     FILE *fileptr;
     fileptr = fopen(filepath, "rb");
-    for (long i = index, j = index; i < filelen; i+=producers_num, j+=producers_num) {
-        if (j >= BUFFERLEN) j = index;
-        fseek(fileptr, i, SEEK_SET);
-        pthread_mutex_lock(&buffer_mutex[j]);
-        while(read[j]) {
-            pthread_cond_wait(&consumed_condition[j], &buffer_mutex[j]);
+    while (!feof(fileptr)) {
+        if (reading_pos <= filelen) fseek(fileptr, reading_pos, SEEK_SET);
+        else {
+            pthread_exit((void*)0);
         }
-        fread(buffer+j, 1, 1, fileptr);
-        printf("%d: Grabbed %c\n", index, buffer[j]);
-        read[j] = 1;
-        pthread_mutex_unlock(&buffer_mutex[j]);
-        pthread_cond_signal(&read_condition[j]);
+        pthread_mutex_lock(&buffer_mutex[reading_pos%BUFFERLEN]);
+        printf("(1) Locked %ld\n", reading_pos);
+        if (reading_pos >= BUFFERLEN) {
+            while(read[reading_pos%BUFFERLEN]) {
+                pthread_cond_wait(&consumed_condition[reading_pos%BUFFERLEN], &buffer_mutex[reading_pos%BUFFERLEN]);
+            }
+        }
+        fread(buffer+(reading_pos%BUFFERLEN), 1, 1, fileptr);
+        read[reading_pos%BUFFERLEN] = 1;
+        printf("(1) Unlocked %ld\n", reading_pos);
+        pthread_mutex_unlock(&buffer_mutex[reading_pos%BUFFERLEN]);
+        pthread_cond_signal(&read_condition[reading_pos%BUFFERLEN]);
+        reading_pos += producers_num;
     }
     fclose(fileptr);
+    pthread_exit((void*)0);
 }
 
 void *adding_to_array(void *thread_index) {
     int index = *((int *)thread_index);
-    // printf("%d: Started Consuming\n", index);
-    for (int i = index; bytes_consumers; i+=consumers_num) {
-        pthread_mutex_lock(&buffer_mutex[i]);
-        while (!read[i]) {
-            pthread_cond_wait(&read_condition[i], &buffer_mutex[i]);
+    long consuming_pos = index;
+    while(bytes_consumers) {
+        pthread_mutex_lock(&buffer_mutex[consuming_pos%BUFFERLEN]);
+        printf("(2) Locked %ld\n", consuming_pos);
+        if (!bytes_consumers || consuming_pos > filelen) {
+            pthread_mutex_unlock(&buffer_mutex[consuming_pos%BUFFERLEN]);
+            pthread_exit((void*)0);
         }
-        // printf("%d: Finished waiting\n");
+        while (!read[consuming_pos % BUFFERLEN] && buffer[consuming_pos % BUFFERLEN != '\000']) {
+            pthread_cond_wait(&read_condition[consuming_pos%BUFFERLEN], &buffer_mutex[consuming_pos%BUFFERLEN]);
+        }
+        if (!bytes_consumers || consuming_pos > filelen) {
+            pthread_mutex_unlock(&buffer_mutex[consuming_pos%BUFFERLEN]);
+            pthread_exit((void*)0);
+        }
         pthread_mutex_lock(&bytes_consumer_mutex);
         bytes_consumers--;
         pthread_mutex_unlock(&bytes_consumer_mutex);
-        pthread_mutex_lock(&solution_mutex[i]);
-        solution_array[buffer[i]]++;
-        printf("%d: Consumed %c\n", index, buffer[i]);
-        buffer[i] = '\000';
-        pthread_mutex_unlock(&solution_mutex[i]);
-        read[i] = 0;
-        pthread_mutex_unlock(&buffer_mutex[i]);
-        pthread_cond_signal(&consumed_condition[i]);
+        pthread_mutex_lock(&solution_mutex[consuming_pos%256]);
+        solution_array[buffer[consuming_pos%BUFFERLEN]]++;
+        buffer[consuming_pos%BUFFERLEN] = '\000';
+        pthread_mutex_unlock(&solution_mutex[consuming_pos%256]);
+        read[consuming_pos%BUFFERLEN] = 0;
+        printf("(2) Unlocked %ld\n", consuming_pos);
+        pthread_mutex_unlock(&buffer_mutex[consuming_pos%BUFFERLEN]);
+        pthread_cond_signal(&consumed_condition[consuming_pos%BUFFERLEN]);
+        consuming_pos += consumers_num;
     }
 }
 
@@ -141,6 +158,7 @@ int main(int argc, char *argv[]) {
         if (i < 256) {
             pthread_mutex_init(&solution_mutex[i], NULL);
             solution_array[i] = 0;
+            solution_aux[i] = i;
         }
         pthread_mutex_init(&buffer_mutex[i], NULL);
         pthread_cond_init(&consumed_condition[i], NULL);
