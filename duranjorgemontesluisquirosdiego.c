@@ -1,3 +1,9 @@
+/*
+    Jorge Durán Campos
+    Luis Montes de Oca Ruiz
+    Diego Quirós Artiñano
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
